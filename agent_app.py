@@ -63,12 +63,22 @@ def prepare_observation_context(state, runtime):
 
 
 async def main():
+    # 检查必需的 API Key
+    if "DEEPSEEK_API_KEY" not in os.environ:
+        print("❌ 错误：未设置 DEEPSEEK_API_KEY 环境变量")
+        print("请先设置: https://platform.deepseek.com/api_keys")
+        print()
+        print("Windows (CMD):    set DEEPSEEK_API_KEY=你的Key")
+        print("Windows (PS):      $env:DEEPSEEK_API_KEY = \"你的Key\"")
+        print("Linux/Mac:         export DEEPSEEK_API_KEY=\"你的Key\"")
+        return
+
     print("正在初始化智能查询 Agent...")
     print("连接到 MCP Server...")
 
     llm = ChatOpenAI(
         model="deepseek-chat",
-        openai_api_key="sk-efd208ebec864598949feb7748a056bb",
+        openai_api_key=os.environ["DEEPSEEK_API_KEY"],
         openai_api_base="https://api.deepseek.com/v1",
         temperature=0
     )

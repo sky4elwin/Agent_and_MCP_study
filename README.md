@@ -23,13 +23,34 @@ weather_agent_demo/
 
 ## 使用步骤
 
-### 1. 安装依赖
+### 1. 设置环境变量
+
+Agent 需要 DeepSeek API Key，请先设置环境变量：
+
+**Windows (PowerShell):**
+```powershell
+$env:DEEPSEEK_API_KEY = "你的DeepSeek-API-Key"
+```
+
+**Windows (CMD):**
+```cmd
+set DEEPSEEK_API_KEY=你的DeepSeek-API-Key
+```
+
+**Linux/Mac:**
+```bash
+export DEEPSEEK_API_KEY="你的DeepSeek-API-Key"
+```
+
+> 获取 API Key: [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
+
+### 2. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 运行 Agent
+### 3. 运行 Agent
 
 Agent 会自动启动 MCP Server 作为子进程，无需单独启动 Server：
 
