@@ -1,0 +1,10 @@
+langchain
+langchain-community
+langchain-core
+langchain-openai
+langchain-mcp-adapters
+openai
+fastmcp
+requests
+yfinance
+flask
