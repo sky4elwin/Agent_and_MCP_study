@@ -300,8 +300,10 @@ def get_exchange_rate(base: str, target: str) -> dict:
 
 
 if __name__ == "__main__":
-    print("启动信息查询 MCP Server (stdio 模式)...")
+    print("启动信息查询 MCP Server (HTTP 模式)...")
+    print("监听地址: http://0.0.0.0:8000")
+    print("MCP 端点: http://127.0.0.1:8000/mcp")
     print("提供工具: get_weather, get_stock_info, get_exchange_rate")
     print("股票数据来源: 新浪财经 (免费)")
     print("汇率数据来源: frankfurter.app (免费)")
-    mcp.run()
+    mcp.run(transport="http")

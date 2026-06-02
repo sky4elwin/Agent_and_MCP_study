@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain.agents.middleware import after_model, before_model
 from langchain.agents.middleware import ModelCallLimitMiddleware
-from mcp.client.stdio import stdio_client, StdioServerParameters
+from langchain_mcp_adapters.sessions import create_session
 import asyncio
 import os
 
@@ -75,7 +75,7 @@ async def main():
         return
 
     print("正在初始化智能查询 Agent...")
-    print("连接到 MCP Server...")
+    print("连接到 MCP Server (HTTP: http://127.0.0.1:8000/mcp)...")
 
     llm = ChatOpenAI(
         model="deepseek-chat",
@@ -84,12 +84,11 @@ async def main():
         temperature=0
     )
 
-    # MCP Server 配置
-    mcp_server_params = StdioServerParameters(
-        command="python",
-        args=["mcp_server.py"],
-        cwd=os.path.dirname(os.path.abspath(__file__)) or "."
-    )
+    # MCP Server HTTP 连接配置
+    connection = {
+        "transport": "streamable_http",
+        "url": "http://127.0.0.1:8000/mcp",
+    }
 
     # 迭代次数限制：最多 10 轮 LLM 调用
     call_limiter = ModelCallLimitMiddleware(
@@ -98,60 +97,54 @@ async def main():
     )
 
     try:
-        # 使用 MCP stdio 客户端连接 MCP Server
-        async with stdio_client(mcp_server_params) as (read, write):
-            from mcp import ClientSession
+        # 使用 HTTP 客户端连接 MCP Server
+        async with create_session(connection) as session:
+            # 加载 MCP 工具
+            tools = await load_mcp_tools(session)
 
-            async with ClientSession(read, write) as session:
-                # 初始化会话
-                await session.initialize()
+            # 创建 Agent（注入 system_prompt + 中间件）
+            agent = create_agent(
+                llm,
+                tools=tools,
+                system_prompt=REACT_SYSTEM_PROMPT,
+                middleware=[highlight_react_steps, prepare_observation_context, call_limiter]
+            )
 
-                # 加载 MCP 工具
-                tools = await load_mcp_tools(session)
+            print("初始化完成！")
+            print("输入城市名查天气，股票代码查股票，或货币代码查汇率（输入 'quit' 退出）")
+            print("  示例: 北京 / Tokyo / AAPL / 000300.SS / CNY USD / EUR JPY")
 
-                # 创建 Agent（注入 system_prompt + 中间件）
-                agent = create_agent(
-                    llm,
-                    tools=tools,
-                    system_prompt=REACT_SYSTEM_PROMPT,
-                    middleware=[highlight_react_steps, prepare_observation_context, call_limiter]
-                )
-
-                print("初始化完成！")
-                print("输入城市名查天气，股票代码查股票，或货币代码查汇率（输入 'quit' 退出）")
-                print("  示例: 北京 / Tokyo / AAPL / 000300.SS / CNY USD / EUR JPY")
-
-                while True:
-                    try:
-                        user_input = input("\n> 查询: ").strip()
-                        if user_input.lower() in ['quit', 'exit', '退出']:
-                            print("再见！")
-                            break
-                        if not user_input:
-                            continue
-
-                        # 重置轮次计数器
-                        _step_counter["count"] = 0
-
-                        result = await agent.ainvoke({
-                            "messages": [("user", f"请帮我查询: {user_input}。如果是城市名就查天气，如果是股票代码就查股票信息，如果是货币对（如 CNY USD）就查汇率。")]
-                        })
-
-                        # 提取最后一条助手的回复
-                        assistant_messages = [msg.content for msg in result["messages"] if hasattr(msg, "content") and msg.type == "ai"]
-                        if assistant_messages:
-                            print(f"\n{'=' * 50}")
-                            print(f"📋 最终结果:\n{assistant_messages[-1]}")
-
-                    except KeyboardInterrupt:
-                        print("\n再见！")
+            while True:
+                try:
+                    user_input = input("\n> 查询: ").strip()
+                    if user_input.lower() in ['quit', 'exit', '退出']:
+                        print("再见！")
                         break
-                    except Exception as e:
-                        print(f"发生错误: {str(e)}")
+                    if not user_input:
+                        continue
+
+                    # 重置轮次计数器
+                    _step_counter["count"] = 0
+
+                    result = await agent.ainvoke({
+                        "messages": [("user", f"请帮我查询: {user_input}。如果是城市名就查天气，如果是股票代码就查股票信息，如果是货币对（如 CNY USD）就查汇率。")]
+                    })
+
+                    # 提取最后一条助手的回复
+                    assistant_messages = [msg.content for msg in result["messages"] if hasattr(msg, "content") and msg.type == "ai"]
+                    if assistant_messages:
+                        print(f"\n{'=' * 50}")
+                        print(f"📋 最终结果:\n{assistant_messages[-1]}")
+
+                except KeyboardInterrupt:
+                    print("\n再见！")
+                    break
+                except Exception as e:
+                    print(f"发生错误: {str(e)}")
 
     except Exception as e:
         print(f"连接 MCP Server 失败: {str(e)}")
-        print("请确保 MCP Server 配置正确")
+        print("请确保 MCP Server 正在运行 (python mcp_server.py)")
 
 
 if __name__ == "__main__":
