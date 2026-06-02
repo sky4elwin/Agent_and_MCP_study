@@ -14,6 +14,9 @@ SINA_HEADERS = {"Referer": "https://finance.sina.com.cn"}
 OPEN_METEO_GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 OPEN_METEO_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 
+# 免费汇率 API (frankfurter.app，无需 API Key)
+EXCHANGE_RATE_API_URL = "https://api.frankfurter.app/latest"
+
 WEATHER_DESCRIPTIONS = {
     0: "晴朗",
     1: "大部晴朗",
@@ -256,8 +259,49 @@ def get_stock_info(symbol: str) -> dict:
         return {"error": f"查询股票 {symbol} 时发生错误: {str(e)}"}
 
 
+@mcp.tool()
+def get_exchange_rate(base: str, target: str) -> dict:
+    """获取两种货币之间的实时汇率
+
+    Args:
+        base: 基准货币代码（如 CNY、USD、EUR、JPY、HKD）
+        target: 目标货币代码（如 CNY、USD、EUR、JPY、HKD）
+
+    Returns:
+        包含基准货币、目标货币、汇率和日期的字典
+    """
+    base = base.upper().strip()
+    target = target.upper().strip()
+
+    try:
+        resp = requests.get(
+            EXCHANGE_RATE_API_URL,
+            params={"from": base, "to": target},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        rate = data.get("rates", {}).get(target)
+        if rate is None:
+            return {"error": f"不支持的货币代码: {target}，或 {base} 无法兑换到 {target}"}
+
+        return {
+            "base": base,
+            "target": target,
+            "rate": rate,
+            "date": data.get("date"),
+        }
+
+    except requests.exceptions.RequestException as e:
+        return {"error": f"查询汇率时网络错误: {str(e)}"}
+    except Exception as e:
+        return {"error": f"查询汇率时发生错误: {str(e)}"}
+
+
 if __name__ == "__main__":
     print("启动信息查询 MCP Server (stdio 模式)...")
-    print("提供工具: get_weather, get_stock_info")
+    print("提供工具: get_weather, get_stock_info, get_exchange_rate")
     print("股票数据来源: 新浪财经 (免费)")
+    print("汇率数据来源: frankfurter.app (免费)")
     mcp.run()
