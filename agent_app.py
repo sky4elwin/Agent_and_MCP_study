@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain.agents.middleware import after_model, before_model
 from langchain.agents.middleware import ModelCallLimitMiddleware
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp import ClientSession
 import asyncio
 import os
@@ -76,13 +76,21 @@ async def main():
         return
 
     print("正在初始化智能查询 Agent...")
-    print("连接到 MCP Server (HTTP: http://127.0.0.1:8000/mcp)...")
+    print("连接到 MCP Server (stdio)...")
 
     llm = ChatOpenAI(
         model="deepseek-chat",
         openai_api_key=os.environ["DEEPSEEK_API_KEY"],
         openai_api_base="https://api.deepseek.com/v1",
         temperature=0
+    )
+
+    # MCP Server 配置
+    mcp_server_params = StdioServerParameters(
+        command="python",
+        args=["mcp_server.py"],
+        cwd=os.path.dirname(os.path.abspath(__file__)) or ".",
+        env={"PYTHONIOENCODING": "utf-8"}
     )
 
     # 迭代次数限制：最多 10 轮 LLM 调用
@@ -92,8 +100,8 @@ async def main():
     )
 
     try:
-        # 使用 MCP streamable HTTP 客户端连接 MCP Server
-        async with streamablehttp_client("http://127.0.0.1:8000/mcp") as (read, write, _):
+        # 使用 MCP stdio 客户端连接 MCP Server
+        async with stdio_client(mcp_server_params) as (read, write):
             async with ClientSession(read, write) as session:
                 # 初始化会话
                 await session.initialize()
